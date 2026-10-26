@@ -1,0 +1,1145 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>合成大西瓜 · 多难度版</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  :root {
+    --bg: #f7e9c8;
+    --text: #3a3226;
+    --accent: #c06030;
+    --gold: #a08050;
+    --panel: #fff;
+  }
+  html, body {
+    height: 100%;
+    font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: var(--bg);
+    overflow: hidden;
+    user-select: none;
+    color: var(--text);
+  }
+  body {
+    background: radial-gradient(circle at 50% 0%, #fff6e0 0%, #f7e9c8 40%, #f0d9a8 100%);
+  }
+
+  .app { position: relative; width: 100%; height: 100%; overflow: hidden; }
+
+  .screen {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.3s ease;
+  }
+  .screen.active { opacity: 1; pointer-events: auto; }
+
+  /* 主菜单 */
+  .menu-title {
+    font-size: 32px; font-weight: 800; color: var(--accent);
+    margin-bottom: 32px; letter-spacing: 0.1em;
+    text-shadow: 2px 2px 0 rgba(255,255,255,.8);
+  }
+  .diff-list {
+    display: flex; flex-direction: column; gap: 14px;
+    width: 100%; max-width: 320px;
+    padding: 0 20px;
+  }
+  .diff-btn {
+    background: var(--panel);
+    border: 1px solid rgba(200,160,100,.4);
+    border-radius: 16px;
+    padding: 16px 20px;
+    display: flex; justify-content: space-between; align-items: center;
+    box-shadow: 0 4px 14px rgba(160,120,60,.1);
+    cursor: pointer; transition: all 0.2s;
+    font-family: inherit;
+  }
+  .diff-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(160,120,60,.2);
+    border-color: var(--accent);
+  }
+  .diff-left { text-align: left; }
+  .diff-name { font-size: 18px; font-weight: 700; color: var(--accent); margin-bottom: 4px; }
+  .diff-info { font-size: 13px; color: var(--gold); }
+  .diff-best { font-size: 14px; font-weight: 700; color: var(--accent); }
+  .diff-best span { font-size: 11px; color: var(--gold); font-weight: normal; display: block; text-align: right; margin-bottom: 2px; }
+
+  /* 游戏 UI */
+  .hud {
+    position: absolute; top: 0; left: 0; right: 0;
+    height: 56px; display: flex; align-items: center; justify-content: space-between;
+    padding: 0 16px; z-index: 20;
+  }
+  .back-btn {
+    pointer-events: auto;
+    background: rgba(255,255,255,.75); backdrop-filter: blur(6px);
+    border: 1px solid rgba(200,160,100,.35); border-radius: 14px;
+    width: 40px; height: 40px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px; color: var(--gold); cursor: pointer; transition: all 0.2s;
+    box-shadow: 0 4px 14px rgba(160,120,60,.15);
+  }
+  .back-btn:hover { background: #fff; color: var(--accent); }
+  .score-box {
+    background: rgba(255,255,255,.75); backdrop-filter: blur(6px);
+    border: 1px solid rgba(200,160,100,.35);
+    border-radius: 14px; padding: 6px 16px;
+    display: flex; align-items: baseline; gap: 8px;
+    box-shadow: 0 4px 14px rgba(160,120,60,.15);
+  }
+  .score-label { font-size: 11px; color: var(--gold); letter-spacing: 0.1em; }
+  .score-value { font-size: 22px; font-weight: 800; color: var(--accent); font-variant-numeric: tabular-nums; transition: transform 0.15s; }
+  .score-value.bump { transform: scale(1.25); }
+  .next-box {
+    background: rgba(255,255,255,.75); backdrop-filter: blur(6px);
+    border: 1px solid rgba(200,160,100,.35);
+    border-radius: 14px; padding: 6px 12px;
+    display: flex; align-items: center; gap: 8px;
+    box-shadow: 0 4px 14px rgba(160,120,60,.15);
+  }
+  .next-label { font-size: 11px; color: var(--gold); letter-spacing: 0.1em; }
+  .next-fruit { width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; }
+
+  #gameWrap {
+    position: relative; border-radius: 16px; overflow: hidden;
+    box-shadow: 0 20px 50px rgba(160,120,60,.35), inset 0 0 0 1px rgba(255,255,255,.5);
+    margin-top: 20px;
+  }
+  canvas { display: block; cursor: pointer; touch-action: none; }
+  .danger-line {
+    position: absolute; left: 0; right: 0; height: 2px;
+    background: repeating-linear-gradient(90deg, rgba(224,80,80,.5) 0, rgba(224,80,80,.5) 8px, transparent 8px, transparent 16px);
+    z-index: 5; pointer-events: none; opacity: 0; transition: opacity 0.3s;
+  }
+  .danger-line.show { opacity: 1; }
+
+  /* 覆盖层 */
+  .overlay {
+    position: absolute; inset: 0;
+    background: rgba(247,233,200,.9); backdrop-filter: blur(8px);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    z-index: 30; padding: 20px; text-align: center;
+    transition: opacity 0.4s;
+  }
+  .overlay.hidden { opacity: 0; pointer-events: none; }
+  .overlay h1 { font-size: 24px; color: var(--accent); margin-bottom: 8px; text-shadow: 2px 2px 0 rgba(255,255,255,.8); }
+  .final-score { font-size: 44px; font-weight: 800; color: var(--accent); margin: 8px 0 4px; font-variant-numeric: tabular-nums; }
+  .final-label { font-size: 12px; color: var(--gold); margin-bottom: 24px; }
+  .best-tag { font-size: 12px; color: #fff; background: #e8b04b; padding: 4px 14px; border-radius: 10px; margin-bottom: 18px; }
+  .start-btn {
+    padding: 12px 36px; font-size: 16px; font-weight: 700; font-family: inherit;
+    color: #fff; background: linear-gradient(135deg, #f09050, #e06030);
+    border: none; border-radius: 30px; cursor: pointer; letter-spacing: 0.1em;
+    box-shadow: 0 6px 20px rgba(224,96,48,.4); transition: all 0.2s;
+  }
+  .start-btn:hover { transform: translateY(-2px); box-shadow: 0 10px 25px rgba(224,96,48,.5); }
+  .start-btn:active { transform: translateY(0) scale(.97); }
+  .btn-row { display: flex; gap: 12px; margin-top: 12px; }
+  .btn-secondary {
+    background: transparent; color: var(--accent);
+    border: 1.5px solid var(--accent); box-shadow: none;
+  }
+  .btn-secondary:hover { background: rgba(192,96,48,.05); box-shadow: none; }
+
+  /* 弹窗 */
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,.4); backdrop-filter: blur(4px);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 100; opacity: 0; pointer-events: none; transition: opacity 0.2s;
+  }
+  .modal-overlay.show { opacity: 1; pointer-events: auto; }
+  .modal {
+    background: #fdf8f0; border-radius: 20px; padding: 28px 24px;
+    width: 80%; max-width: 320px; text-align: center;
+    box-shadow: 0 20px 50px rgba(0,0,0,.2);
+    transform: scale(0.9); transition: transform 0.2s cubic-bezier(.34,1.56,.64,1);
+  }
+  .modal-overlay.show .modal { transform: scale(1); }
+  .modal-icon { font-size: 32px; margin-bottom: 12px; }
+  .modal h2 { font-size: 20px; color: var(--accent); margin-bottom: 8px; }
+  .modal p { font-size: 14px; color: var(--gold); line-height: 1.6; margin-bottom: 24px; }
+  .modal-btns { display: flex; gap: 12px; }
+  .modal-btn {
+    flex: 1; padding: 12px; font-size: 15px; font-weight: 600; font-family: inherit;
+    border-radius: 12px; cursor: pointer; transition: all 0.2s;
+  }
+  .modal-btn.cancel { background: #e8dfd0; color: var(--text); border: none; }
+  .modal-btn.cancel:hover { background: #ddd0b8; }
+  .modal-btn.ok { background: var(--accent); color: #fff; border: none; box-shadow: 0 4px 12px rgba(192,96,48,.3); }
+  .modal-btn.ok:hover { background: #a05020; }
+
+  .pop-score {
+    position: absolute; font-size: 16px; font-weight: 800; color: var(--accent);
+    pointer-events: none; z-index: 15;
+    animation: popUp 0.7s ease-out forwards;
+    text-shadow: 0 1px 3px rgba(255,255,255,.8);
+  }
+  @keyframes popUp {
+    0% { transform: translate(-50%, 0) scale(0.5); opacity: 0; }
+    30% { transform: translate(-50%, -10px) scale(1.2); opacity: 1; }
+    100% { transform: translate(-50%, -36px) scale(1); opacity: 0; }
+  }
+  
+  .hint-bar {
+    position: absolute; bottom: 14px; font-size: 11px; color: var(--gold);
+    letter-spacing: 0.05em; opacity: 0.7; pointer-events: none; text-align: center; width: 100%;
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <!-- 主菜单 -->
+  <div id="mainMenu" class="screen active">
+    <h1 class="menu-title">合成大西瓜</h1>
+    <div class="diff-list" id="diffList"></div>
+  </div>
+
+  <!-- 游戏界面 -->
+  <div id="gameUI" class="screen">
+    <div class="hud">
+      <button id="backBtn" class="back-btn" title="返回主菜单">↩</button>
+      <div class="score-box">
+        <span class="score-label" id="scoreLabel">得分</span>
+        <span class="score-value" id="scoreDisplay">0</span>
+      </div>
+      <div class="next-box">
+        <span class="next-label">下一个</span>
+        <div class="next-fruit" id="nextFruitDisplay"></div>
+      </div>
+    </div>
+    
+    <div id="gameWrap">
+      <canvas id="gameCanvas"></canvas>
+      <div class="danger-line" id="dangerLine"></div>
+      
+      <div class="overlay hidden" id="gameOverOverlay">
+        <h1>游戏结束</h1>
+        <div class="best-tag" id="bestTag">最高纪录：0</div>
+        <div class="final-score" id="finalScore">0</div>
+        <div class="final-label" id="finalLabel">本局得分</div>
+        <div class="btn-row">
+          <button class="start-btn" id="restartBtn">再来一局</button>
+          <button class="start-btn btn-secondary" id="gameOverBackBtn">返回菜单</button>
+        </div>
+      </div>
+    </div>
+    <div class="hint-bar">点击 / 触摸画布投放水果 · 越过红线触发倒计时</div>
+  </div>
+</div>
+
+<!-- 确认返回弹窗 -->
+<div class="modal-overlay" id="confirmModal">
+  <div class="modal">
+    <div class="modal-icon">⚠️</div>
+    <h2>返回主菜单</h2>
+    <p>当前对局进度将不会保存，确定要退出并返回主菜单吗？</p>
+    <div class="modal-btns">
+      <button class="modal-btn cancel" id="confirmCancel">取消</button>
+      <button class="modal-btn ok" id="confirmOk">确定返回</button>
+    </div>
+  </div>
+</div>
+
+<!-- 多多益善规则弹窗 -->
+<div class="modal-overlay" id="rulesModal">
+  <div class="modal">
+    <div class="modal-icon">🍉</div>
+    <h2>多多益善玩法</h2>
+    <p style="text-align: left; font-size: 14px; line-height: 1.8; color: var(--text); margin-bottom: 20px;">
+      <b>水果种类共9种，建议在难度3合成过西瓜后体验。</b><br><br>
+      <span style="color: var(--gold); font-size: 13px;">
+      1. 容器为长条状（高为难度3的 5/3）。<br>
+      2. 合成西瓜后仅存在 1 秒。<br>
+      3. 1 秒后西瓜自动消失。<br>
+      4. 积分记录合成西瓜的总个数。
+      </span>
+    </p>
+    <div class="modal-btns">
+      <button class="modal-btn ok" id="rulesOk" style="width: 100%;">确定</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   基础数据定义
+   ============================================================ */
+const FRUIT_POOL = [
+  { name: '樱桃',   emoji: '🍒', color: '#d63c3c', color2: '#8a1e1e' },
+  { name: '橘子',   emoji: '🍊', color: '#f09030', color2: '#c06010' },
+  { name: '草莓',   emoji: '🍓', color: '#e8506a', color2: '#a01e3c' },
+  { name: '柿子',   emoji: '🍑', color: '#f07050', color2: '#c04020' },
+  { name: '苹果',   emoji: '🍎', color: '#e83c3c', color2: '#a01010' },
+  { name: '梨',     emoji: '🍐', color: '#c8d840', color2: '#88a010' },
+  { name: '甜瓜',   emoji: '🍈', color: '#a8d860', color2: '#70a020' },
+  { name: '菠萝',   emoji: '🍍', color: '#f0c040', color2: '#c09010' },
+  { name: '猕猴桃', emoji: '🥝', color: '#80b040', color2: '#507010' },
+  { name: '南瓜',   emoji: '🎃', color: '#f08020', color2: '#c05000' },
+  { name: '西瓜',   emoji: '🍉', color: '#4cc85c', color2: '#207830' }
+];
+
+const DIFFICULTIES = [
+  { id: 1, name: '难度 1', W: 216, H: 360, radii: [13, 19, 27, 36, 46, 58, 90], indices: [0, 1, 2, 3, 4, 5, 10] },
+  { id: 2, name: '难度 2', W: 243, H: 405, radii: [14, 18, 23, 30, 39, 50, 65, 101], indices: [0, 1, 2, 3, 4, 5, 6, 10] },
+  { id: 3, name: '难度 3', W: 273.375, H: 455.625, radii: [15, 19, 24, 30, 37, 47, 59, 73, 114], indices: [0, 1, 2, 3, 4, 5, 6, 7, 10] },
+  { id: 4, name: '难度 4', W: 307.5, H: 512.5, radii: [17, 21, 25, 31, 38, 46, 56, 68, 83, 128], indices: [0, 1, 2, 3, 4, 5, 6, 7, 8, 10] },
+  { id: 5, name: '难度 5', W: 345.99, H: 576.65, radii: [19, 23, 27, 32, 39, 46, 55, 65, 78, 93, 144], indices: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10] },
+  // 多多益善模式：宽/种类/大小同难度3，高度为难度3的5/3
+  { id: 6, name: '多多益善', W: 273.375, H: 455.625 * (5/3), radii: [15, 19, 24, 30, 37, 47, 59, 73, 114], indices: [0, 1, 2, 3, 4, 5, 6, 7, 10], isEndless: true }
+];
+
+DIFFICULTIES.forEach(d => {
+  d.fruits = d.radii.map((r, i) => {
+    const pool = FRUIT_POOL[d.indices[i]];
+    return { ...pool, radius: r, score: (i + 1) * 2 };
+  });
+});
+
+/* ============================================================
+   核心 Game 类
+   ============================================================ */
+class Fruit {
+  constructor(x, y, level, config) {
+    this.x = x;
+    this.y = y;
+    this.vx = 0;
+    this.vy = 0;
+    this.level = level;
+    this.radius = config.radius;
+    this.mass = this.radius * this.radius; 
+    this.inertia = 0.5 * this.mass * this.radius * this.radius; 
+    this.merged = false;
+    this.spawnTime = performance.now();
+    this.rotation = 0;          
+    this.rotationSpeed = 0; 
+    
+    // 针对多多益善模式的标记
+    this.isTrackedWatermelon = false;
+    this.trackStartTime = 0;
+  }
+}
+
+class Game {
+  constructor(canvas, diffConfig) {
+    this.canvas = canvas;
+    this.ctx = canvas.getContext('2d');
+    this.dpr = Math.min(window.devicePixelRatio || 1, 2);
+    this.diff = diffConfig;
+    this.isEndless = diffConfig.isEndless || false;
+    
+    this.W = diffConfig.W;
+    this.H = diffConfig.H;
+    this.wallThickness = this.W * 0.025;
+    this.dangerLineY = this.H * 0.144;
+    
+    // 物理参数
+    this.GRAVITY = 0.08 * (this.W / 216);     
+    this.AIR_DRAG = 0.99;                    
+    this.FRICTION = 0.18;                    
+    this.MERGE_TOLERANCE = 1.2 * (this.W / 216);
+    this.FRUITS = diffConfig.fruits;
+    
+    this.fruits = [];
+    this.score = 0;
+    this.watermelonCount = 0; 
+    
+    const storageKey = this.isEndless ? 'watermelon_best_endless' : `watermelon_best_d${this.diff.id}`;
+    this.best = parseInt(localStorage.getItem(storageKey) || '0', 10);
+    
+    this.currentLevel = this.randomLevel();
+    this.nextLevel = this.randomLevel();
+    this.dropX = this.W / 2;
+    this.canDrop = true;
+    this.dropCooldown = 0;
+    this.isRunning = false;
+    this.isGameOver = false;
+    this.dangerActive = false;
+    this.countdown = -1;
+    this.particles = [];
+    this.shake = 0;
+
+    this.resize();
+    this.bindEvents();
+  }
+
+  randomLevel() {
+    const maxLevel = this.FRUITS.length - 1; 
+    let weights = [];
+    let totalWeight = 0;
+    
+    for (let i = 0; i < maxLevel; i++) {
+      let w = Math.max(1, Math.pow(0.55, i) * 100);
+      weights.push(w);
+      totalWeight += w;
+    }
+    
+    let rand = Math.random() * totalWeight;
+    for (let i = 0; i < maxLevel; i++) {
+      rand -= weights[i];
+      if (rand <= 0) return i;
+    }
+    return 0;
+  }
+
+  resize() {
+    const maxW = Math.min(window.innerWidth - 24, 420); 
+    const maxH = window.innerHeight - 110;
+    let scale = Math.min(maxW / this.W, maxH / this.H);
+    scale = Math.min(scale, 1.2);
+    scale = Math.max(scale, 0.5);
+
+    const dispW = Math.floor(this.W * scale);
+    const dispH = Math.floor(this.H * scale);
+    this.canvas.style.width = dispW + 'px';
+    this.canvas.style.height = dispH + 'px';
+    this.canvas.width = dispW * this.dpr;
+    this.canvas.height = dispH * this.dpr;
+    this.scale = scale;
+    this.ctx.setTransform(this.dpr * scale, 0, 0, this.dpr * scale, 0, 0);
+
+    document.getElementById('dangerLine').style.top = (this.dangerLineY * scale) + 'px';
+  }
+
+  bindEvents() {
+    const handler = (clientX) => {
+      if (!this.isRunning || this.isGameOver) return;
+      const rect = this.canvas.getBoundingClientRect();
+      const x = (clientX - rect.left) / this.scale;
+      this.dropX = Math.max(
+        this.FRUITS[this.currentLevel].radius + this.wallThickness,
+        Math.min(this.W - this.FRUITS[this.currentLevel].radius - this.wallThickness, x)
+      );
+    };
+
+    this.canvas.addEventListener('mousemove', (e) => {
+      if (!this.isRunning || this.isGameOver) return;
+      handler(e.clientX);
+    });
+
+    this.canvas.addEventListener('click', (e) => {
+      if (!this.isRunning || this.isGameOver) return;
+      handler(e.clientX);
+      this.drop();
+    });
+
+    this.canvas.addEventListener('touchstart', (e) => {
+      if (!this.isRunning || this.isGameOver) return;
+      handler(e.touches[0].clientX);
+    }, { passive: true });
+
+    this.canvas.addEventListener('touchmove', (e) => {
+      if (!this.isRunning || this.isGameOver) return;
+      handler(e.touches[0].clientX);
+      e.preventDefault();
+    }, { passive: false });
+
+    this.canvas.addEventListener('touchend', (e) => {
+      if (!this.isRunning || this.isGameOver) return;
+      this.drop();
+      e.preventDefault();
+    }, { passive: false });
+
+    window.addEventListener('resize', () => this.resize());
+  }
+
+  start() {
+    this.fruits = [];
+    this.score = 0;
+    this.watermelonCount = 0;
+    this.updateScoreDisplay();
+    
+    this.currentLevel = this.randomLevel();
+    this.nextLevel = this.randomLevel();
+    this.dropX = this.W / 2;
+    this.canDrop = true;
+    this.dropCooldown = 0;
+    this.isRunning = true;
+    this.isGameOver = false;
+    this.dangerActive = false;
+    this.countdown = -1;
+    this.particles = [];
+    this.shake = 0;
+    this.updateNextDisplay();
+    document.getElementById('dangerLine').classList.remove('show');
+    document.getElementById('gameOverOverlay').classList.add('hidden');
+  }
+
+  drop() {
+    if (!this.canDrop || !this.isRunning || this.isGameOver) return;
+    const level = this.currentLevel;
+    const r = this.FRUITS[level].radius;
+    const x = this.dropX;
+    const y = this.wallThickness + r + 2;
+    
+    const f = new Fruit(x, y, level, this.FRUITS[level]);
+    f.vy = 0.5; 
+    this.fruits.push(f);
+    
+    this.currentLevel = this.nextLevel;
+    this.nextLevel = this.randomLevel();
+    this.updateNextDisplay();
+    this.canDrop = false;
+    this.dropCooldown = 22;
+  }
+
+  updateNextDisplay() {
+    const el = document.getElementById('nextFruitDisplay');
+    const fruit = this.FRUITS[this.nextLevel];
+    const r = Math.min(fruit.radius, 20);
+    el.innerHTML = `<div style="width:${r*2}px;height:${r*2}px;border-radius:50%;background:radial-gradient(circle at 35% 30%, ${fruit.color}, ${fruit.color2});display:flex;align-items:center;justify-content:center;font-size:${r}px;line-height:1;box-shadow:inset -2px -2px 6px rgba(0,0,0,.15);">${fruit.emoji}</div>`;
+  }
+
+  updateScoreDisplay() {
+    const el = document.getElementById('scoreDisplay');
+    const labelEl = document.getElementById('scoreLabel');
+    
+    if (this.isEndless) {
+      labelEl.textContent = '西瓜数';
+      el.textContent = this.watermelonCount;
+    } else {
+      labelEl.textContent = '得分';
+      el.textContent = this.score;
+    }
+    
+    el.classList.add('bump');
+    setTimeout(() => el.classList.remove('bump'), 150);
+  }
+
+  addScore(n, x, y) {
+    if (this.isEndless) {
+      // 多多益善模式：不再飘字，仅顶部更新
+      return;
+    }
+    
+    this.score += n;
+    this.updateScoreDisplay();
+    const wrap = document.getElementById('gameWrap');
+    const pop = document.createElement('div');
+    pop.className = 'pop-score';
+    pop.textContent = '+' + n;
+    pop.style.left = (x * this.scale) + 'px';
+    pop.style.top = (y * this.scale) + 'px';
+    wrap.appendChild(pop);
+    setTimeout(() => pop.remove(), 700);
+  }
+
+  update() {
+    if (!this.isRunning || this.isGameOver) return;
+
+    if (this.dropCooldown > 0) this.dropCooldown--;
+    if (this.dropCooldown === 0) this.canDrop = true;
+
+    for (let s = 0; s < 4; s++) {
+      this.physicsStep(1 / 4);
+    }
+
+    this.handleMerges();
+    
+    // 处理特殊模式下的西瓜1s消失逻辑
+    if (this.isEndless) {
+      const now = performance.now();
+      for (const f of this.fruits) {
+        if (f.isTrackedWatermelon && !f.merged) {
+          if (now - f.trackStartTime > 1000) {
+            f.merged = true;
+            this.spawnParticles(f.x, f.y, '#4cc85c', 10);
+            playMergeSound(10);
+          }
+        }
+      }
+    }
+    
+    this.fruits = this.fruits.filter(f => {
+      if (f.merged) return false;
+      if (f.y + f.radius < -20) return false; 
+      return true;
+    });
+
+    this.updateParticles();
+    if (this.shake > 0) this.shake *= 0.9;
+
+    this.checkDanger();
+    
+    if (this.dangerActive) {
+      if (this.countdown < 0) this.countdown = 3.0;
+      this.countdown -= 1/60;
+      if (this.countdown <= 0) this.gameOver();
+    } else {
+      this.countdown = -1;
+    }
+  }
+
+  physicsStep(dt) {
+    const fruits = this.fruits;
+    const wall = this.wallThickness;
+    const maxLevel = this.FRUITS.length - 1;
+
+    for (const f of fruits) {
+      if (f.merged) continue;
+      f.vy += this.GRAVITY * dt * 4;
+      f.vx *= this.AIR_DRAG;
+      f.vy *= this.AIR_DRAG;
+      
+      f.x += f.vx * dt * 8;
+      f.y += f.vy * dt * 8;
+      
+      f.rotation += f.rotationSpeed;
+    }
+
+    for (let iter = 0; iter < 10; iter++) {
+      for (let i = 0; i < fruits.length; i++) {
+        const a = fruits[i];
+        if (a.merged) continue;
+        for (let j = i + 1; j < fruits.length; j++) {
+          const b = fruits[j];
+          if (b.merged) continue;
+          const dx = b.x - a.x;
+          const dy = b.y - a.y;
+          const distSq = dx * dx + dy * dy;
+          const minDist = a.radius + b.radius;
+
+          if (distSq < minDist * minDist && distSq > 0.001) {
+            const dist = Math.sqrt(distSq);
+            const overlap = minDist - dist;
+            const nx = dx / dist;
+            const ny = dy / dist;
+
+            if (a.level === b.level && a.level < maxLevel) continue;
+
+            const totalMass = a.mass + b.mass;
+            const aMove = b.mass / totalMass;
+            const bMove = a.mass / totalMass;
+
+            const correction = overlap * 0.9;
+            a.x -= nx * correction * aMove;
+            a.y -= ny * correction * aMove;
+            b.x += nx * correction * bMove;
+            b.y += ny * correction * bMove;
+
+            const rvx = b.vx - a.vx;
+            const rvy = b.vy - a.vy;
+            const velAlongNormal = rvx * nx + rvy * ny;
+
+            if (velAlongNormal < 0) {
+              const e = 0.15;
+              const jImp = -(1 + e) * velAlongNormal / (1 / a.mass + 1 / b.mass);
+              const impulseX = jImp * nx;
+              const impulseY = jImp * ny;
+
+              a.vx -= impulseX / a.mass;
+              a.vy -= impulseY / a.mass;
+              b.vx += impulseX / b.mass;
+              b.vy += impulseY / b.mass;
+
+              const tx = -ny, ty = nx;
+              const velTangent = rvx * tx + rvy * ty;
+              
+              if (Math.abs(velTangent) > 0.01) {
+                const jTangent = -velTangent * this.FRICTION / (1 / a.mass + 1 / b.mass);
+                a.vx -= jTangent * tx / a.mass;
+                a.vy -= jTangent * ty / a.mass;
+                b.vx += jTangent * tx / b.mass;
+                b.vy += jTangent * ty / b.mass;
+
+                a.rotationSpeed -= (jTangent * a.radius) / a.inertia;
+                b.rotationSpeed += (jTangent * b.radius) / b.inertia;
+                
+                a.rotationSpeed = Math.max(-0.1, Math.min(0.1, a.rotationSpeed));
+                b.rotationSpeed = Math.max(-0.1, Math.min(0.1, b.rotationSpeed));
+              }
+            }
+          }
+        }
+      }
+
+      for (const f of fruits) {
+        if (f.merged) continue;
+        if (f.x - f.radius < wall) {
+          f.x = wall + f.radius;
+          if (f.vx < 0) f.vx = -f.vx * 0.2;
+        }
+        if (f.x + f.radius > this.W - wall) {
+          f.x = this.W - wall - f.radius;
+          if (f.vx > 0) f.vx = -f.vx * 0.2;
+        }
+        if (f.y + f.radius > this.H - wall) {
+          f.y = this.H - wall - f.radius;
+          if (f.vy > 0) {
+            f.vy = -f.vy * 0.15;
+            if (Math.abs(f.vy) < 0.3) f.vy = 0;
+          }
+        }
+      }
+    }
+
+    for (const f of fruits) {
+      if (f.merged) continue;
+      f.rotationSpeed *= 0.98;
+      if (Math.abs(f.vx) < 0.1 && Math.abs(f.vy) < 0.1) {
+        f.rotationSpeed *= 0.8;
+        if (Math.abs(f.rotationSpeed) < 0.001) f.rotationSpeed = 0;
+      }
+    }
+  }
+
+  handleMerges() {
+    const fruits = this.fruits;
+    const merges = [];
+    const maxLevel = this.FRUITS.length - 1;
+
+    for (let i = 0; i < fruits.length; i++) {
+      const a = fruits[i];
+      if (a.merged) continue;
+      for (let j = i + 1; j < fruits.length; j++) {
+        const b = fruits[j];
+        if (b.merged) continue;
+        if (a.level !== b.level) continue;
+        if (a.level >= maxLevel) continue;
+
+        const dx = b.x - a.x;
+        const dy = b.y - a.y;
+        const distSq = dx * dx + dy * dy;
+        const mergeDist = a.radius + b.radius + this.MERGE_TOLERANCE;
+
+        if (distSq <= mergeDist * mergeDist) {
+          merges.push([a, b]);
+          a.merged = true;
+          b.merged = true;
+        }
+      }
+    }
+
+    for (const [a, b] of merges) {
+      const newLevel = a.level + 1;
+      const newX = (a.x + b.x) / 2;
+      const newY = (a.y + b.y) / 2;
+      const newFruit = new Fruit(newX, newY, newLevel, this.FRUITS[newLevel]);
+      newFruit.vx = (a.vx + b.vx) / 2;
+      newFruit.vy = (a.vy + b.vy) / 2 - 0.3;
+      newFruit.rotationSpeed = (a.rotationSpeed + b.rotationSpeed) / 2;
+      
+      if (this.isEndless && newLevel === maxLevel) {
+        this.watermelonCount++;
+        this.updateScoreDisplay(); // 更新顶部显示
+        newFruit.isTrackedWatermelon = true;
+        newFruit.trackStartTime = performance.now();
+        this.addScore(0, newX, newY); // 此时 addScore 被重载为空实现
+      } else {
+        this.addScore(this.FRUITS[newLevel].score, newX, newY);
+      }
+      
+      this.fruits.push(newFruit);
+      this.spawnParticles(newX, newY, this.FRUITS[newLevel].color, newLevel);
+      this.shake = Math.min(this.shake + 2 + newLevel * 0.5, 6);
+      playMergeSound(newLevel);
+    }
+  }
+
+  spawnParticles(x, y, color, level) {
+    const count = 6 + level * 2;
+    for (let i = 0; i < count; i++) {
+      const angle = (Math.PI * 2 * i) / count + Math.random() * 0.3;
+      const speed = 1.5 + Math.random() * 2.5 + level * 0.2;
+      this.particles.push({
+        x, y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed - 1,
+        life: 1,
+        color,
+        size: 1.5 + Math.random() * 2
+      });
+    }
+  }
+
+  updateParticles() {
+    for (const p of this.particles) {
+      p.x += p.vx;
+      p.y += p.vy;
+      p.vy += 0.15;
+      p.vx *= 0.97;
+      p.life -= 0.025;
+    }
+    this.particles = this.particles.filter(p => p.life > 0);
+  }
+
+  checkDanger() {
+    let danger = false;
+    const lineY = this.dangerLineY;
+    const now = performance.now();
+    for (const f of this.fruits) {
+      if (f.merged) continue;
+      if (now - f.spawnTime < 800) continue;
+      if (f.y - f.radius < lineY && Math.abs(f.vy) < 1.5) {
+        danger = true;
+        break;
+      }
+    }
+
+    if (danger !== this.dangerActive) {
+      this.dangerActive = danger;
+      document.getElementById('dangerLine').classList.toggle('show', danger);
+    }
+  }
+
+  gameOver() {
+    if (this.isGameOver) return;
+    this.isGameOver = true;
+    this.isRunning = false;
+    playGameOverSound();
+
+    const storageKey = this.isEndless ? 'watermelon_best_endless' : `watermelon_best_d${this.diff.id}`;
+    const finalScoreVal = this.isEndless ? this.watermelonCount : this.score;
+    
+    if (finalScoreVal > this.best) {
+      this.best = finalScoreVal;
+      localStorage.setItem(storageKey, this.best);
+    }
+
+    document.getElementById('finalScore').textContent = finalScoreVal;
+    document.getElementById('finalLabel').textContent = this.isEndless ? '合成西瓜总数' : '本局得分';
+    document.getElementById('bestTag').textContent = '最高纪录：' + this.best + (this.isEndless ? ' 个' : '');
+    document.getElementById('gameOverOverlay').classList.remove('hidden');
+  }
+
+  render() {
+    const ctx = this.ctx;
+    const W = this.W, H = this.H, wall = this.wallThickness;
+
+    ctx.save();
+    if (this.shake > 0.1) {
+      ctx.translate((Math.random() - 0.5) * this.shake, (Math.random() - 0.5) * this.shake);
+    }
+
+    const grad = ctx.createLinearGradient(0, 0, 0, H);
+    grad.addColorStop(0, '#fdf5e0');
+    grad.addColorStop(1, '#f8e8c0');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, W, H);
+
+    if (this.dangerActive) {
+      ctx.fillStyle = 'rgba(224,80,80,0.08)';
+      ctx.fillRect(0, 0, W, this.dangerLineY);
+    } else {
+      ctx.fillStyle = 'rgba(224,80,80,0.02)';
+      ctx.fillRect(0, 0, W, this.dangerLineY);
+    }
+
+    ctx.fillStyle = 'rgba(200,170,120,.35)';
+    ctx.fillRect(0, 0, wall, H);
+    ctx.fillRect(W - wall, 0, wall, H);
+    ctx.fillRect(0, H - wall, W, wall);
+
+    ctx.strokeStyle = 'rgba(255,255,255,.5)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(wall + 0.5, 0);
+    ctx.lineTo(wall + 0.5, H);
+    ctx.moveTo(W - wall - 0.5, 0);
+    ctx.lineTo(W - wall - 0.5, H);
+    ctx.stroke();
+
+    if (this.dangerActive) {
+      ctx.save();
+      ctx.strokeStyle = 'rgba(224,80,80,' + (0.4 + Math.sin(performance.now() / 100) * 0.3) + ')';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([8, 8]);
+      ctx.beginPath();
+      ctx.moveTo(wall, this.dangerLineY);
+      ctx.lineTo(W - wall, this.dangerLineY);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    if (this.isRunning && !this.isGameOver && this.canDrop) {
+      const level = this.currentLevel;
+      const r = this.FRUITS[level].radius;
+      const x = this.dropX;
+      const y = wall + r + 2;
+
+      ctx.save();
+      ctx.strokeStyle = 'rgba(224,96,48,.2)';
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([4, 6]);
+      ctx.beginPath();
+      ctx.moveTo(x, y + r);
+      ctx.lineTo(x, H - wall);
+      ctx.stroke();
+      ctx.restore();
+
+      ctx.save();
+      ctx.globalAlpha = 0.6;
+      this.drawFruitShape(ctx, x, y, r, level, 0);
+      ctx.restore();
+    }
+
+    for (const f of this.fruits) {
+      if (f.merged) continue;
+      this.drawFruitShape(ctx, f.x, f.y, f.radius, f.level, f.rotation);
+    }
+
+    for (const p of this.particles) {
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, p.life);
+      ctx.fillStyle = p.color;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.size * p.life, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    if (this.countdown > 0) {
+      ctx.save();
+      ctx.fillStyle = 'rgba(224, 80, 80, 0.85)';
+      const fontSize = Math.floor(48 * (W / 216));
+      ctx.font = `bold ${fontSize}px "PingFang SC", "Microsoft YaHei", sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      const shakeX = (Math.random() - 0.5) * 4;
+      const shakeY = (Math.random() - 0.5) * 4;
+      ctx.fillText(Math.ceil(this.countdown), W / 2 + shakeX, H / 2 + shakeY);
+      ctx.restore();
+    }
+
+    ctx.restore();
+  }
+
+  drawFruitShape(ctx, x, y, r, level, rotation) {
+    const fruit = this.FRUITS[level];
+    ctx.save();
+    ctx.translate(x, y);
+
+    ctx.save();
+    ctx.shadowColor = 'rgba(120,80,40,.25)';
+    ctx.shadowBlur = r * 0.25;
+    ctx.shadowOffsetY = r * 0.12;
+
+    const grad = ctx.createRadialGradient(-r * 0.35, -r * 0.35, r * 0.1, 0, 0, r);
+    grad.addColorStop(0, lighten(fruit.color, 30));
+    grad.addColorStop(0.5, fruit.color);
+    grad.addColorStop(1, fruit.color2);
+
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(0, 0, r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    ctx.strokeStyle = 'rgba(0,0,0,.08)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(0, 0, r, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.save();
+    const hl = ctx.createRadialGradient(-r * 0.35, -r * 0.4, 0, -r * 0.35, -r * 0.4, r * 0.7);
+    hl.addColorStop(0, 'rgba(255,255,255,.55)');
+    hl.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = hl;
+    ctx.beginPath();
+    ctx.arc(0, 0, r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    ctx.save();
+    ctx.rotate(rotation);
+    ctx.font = `${r * 1.1}px "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.globalAlpha = 0.95;
+    ctx.fillText(fruit.emoji, 0, r * 0.05);
+    ctx.restore();
+
+    ctx.restore();
+  }
+
+  loop() {
+    if (this.isRunning) {
+      this.update();
+      this.render();
+    }
+    requestAnimationFrame(() => this.loop());
+  }
+}
+
+function lighten(hex, amount) {
+  const num = parseInt(hex.replace('#', ''), 16);
+  let r = (num >> 16) + amount;
+  let g = ((num >> 8) & 0xff) + amount;
+  let b = (num & 0xff) + amount;
+  r = Math.min(255, Math.max(0, r));
+  g = Math.min(255, Math.max(0, g));
+  b = Math.min(255, Math.max(0, b));
+  return '#' + ((r << 16) | (g << 8) | b).toString(16).padStart(6, '0');
+}
+
+let audioCtx = null;
+function initAudio() {
+  if (!audioCtx) {
+    try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {}
+  }
+  if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+}
+
+function playMergeSound(level) {
+  if (!audioCtx) return;
+  const t = audioCtx.currentTime;
+  const baseFreq = 300 + level * 80;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(baseFreq, t);
+  osc.frequency.exponentialRampToValueAtTime(baseFreq * 1.5, t + 0.1);
+  gain.gain.setValueAtTime(0.12, t);
+  gain.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
+  osc.connect(gain).connect(audioCtx.destination);
+  osc.start(t);
+  osc.stop(t + 0.22);
+}
+
+function playGameOverSound() {
+  if (!audioCtx) return;
+  const t = audioCtx.currentTime;
+  [392, 349, 293, 220].forEach((freq, i) => {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'triangle';
+    osc.frequency.value = freq;
+    const start = t + i * 0.12;
+    gain.gain.setValueAtTime(0, start);
+    gain.gain.linearRampToValueAtTime(0.1, start + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.001, start + 0.3);
+    osc.connect(gain).connect(audioCtx.destination);
+    osc.start(start);
+    osc.stop(start + 0.32);
+  });
+}
+
+/* ============================================================
+   界面交互逻辑
+   ============================================================ */
+const canvas = document.getElementById('gameCanvas');
+let currentGame = null;
+
+function renderMainMenu() {
+  const list = document.getElementById('diffList');
+  list.innerHTML = '';
+  DIFFICULTIES.forEach(diff => {
+    const storageKey = diff.isEndless ? 'watermelon_best_endless' : `watermelon_best_d${diff.id}`;
+    const best = parseInt(localStorage.getItem(storageKey) || '0', 10);
+    
+    const btn = document.createElement('button');
+    btn.className = 'diff-btn';
+    btn.innerHTML = `
+      <div class="diff-left">
+        <div class="diff-name">${diff.name}</div>
+        <div class="diff-info">共 ${diff.fruits.length} 种水果${diff.isEndless ? ' · 限时速消' : ''}</div>
+      </div>
+      <div class="diff-best">
+        <span>最高${diff.isEndless ? '数' : '分'}</span>
+        ${best}${diff.isEndless ? ' 个' : ''}
+      </div>
+    `;
+    btn.addEventListener('click', () => {
+      if (diff.isEndless) {
+        document.getElementById('rulesModal').classList.add('show');
+        document.getElementById('rulesOk').onclick = () => {
+          document.getElementById('rulesModal').classList.remove('show');
+          startGame(diff.id);
+        };
+      } else {
+        startGame(diff.id);
+      }
+    });
+    list.appendChild(btn);
+  });
+}
+
+function showMenu() {
+  if (currentGame) {
+    if (currentGame.isRunning && currentGame.isEndless) {
+      const finalVal = currentGame.watermelonCount;
+      if (finalVal > currentGame.best) {
+        currentGame.best = finalVal;
+        localStorage.setItem('watermelon_best_endless', currentGame.best);
+      }
+    }
+    currentGame.isRunning = false;
+    currentGame.isGameOver = true;
+  }
+  renderMainMenu();
+  document.getElementById('gameUI').classList.remove('active');
+  document.getElementById('mainMenu').classList.add('active');
+}
+
+function startGame(diffId) {
+  const config = DIFFICULTIES.find(d => d.id === diffId);
+  document.getElementById('mainMenu').classList.remove('active');
+  document.getElementById('gameUI').classList.add('active');
+  
+  if (!currentGame) {
+    currentGame = new Game(canvas, config);
+    currentGame.loop();
+  } else {
+    currentGame.diff = config;
+    currentGame.isEndless = config.isEndless || false;
+    currentGame.W = config.W;
+    currentGame.H = config.H;
+    currentGame.wallThickness = config.W * 0.025;
+    currentGame.dangerLineY = config.H * 0.144;
+    currentGame.GRAVITY = 0.08 * (config.W / 216);
+    currentGame.MERGE_TOLERANCE = 1.2 * (config.W / 216);
+    currentGame.FRUITS = config.fruits;
+    
+    const storageKey = currentGame.isEndless ? 'watermelon_best_endless' : `watermelon_best_d${config.id}`;
+    currentGame.best = parseInt(localStorage.getItem(storageKey) || '0', 10);
+    
+    currentGame.resize();
+  }
+  
+  currentGame.start();
+}
+
+document.getElementById('backBtn').addEventListener('click', () => {
+  if (!currentGame || !currentGame.isRunning || currentGame.isGameOver) {
+    showMenu();
+  } else {
+    document.getElementById('confirmModal').classList.add('show');
+  }
+});
+
+document.getElementById('confirmCancel').addEventListener('click', () => {
+  document.getElementById('confirmModal').classList.remove('show');
+});
+
+document.getElementById('confirmOk').addEventListener('click', () => {
+  document.getElementById('confirmModal').classList.remove('show');
+  showMenu();
+});
+
+document.getElementById('restartBtn').addEventListener('click', () => {
+  initAudio();
+  currentGame.start();
+});
+
+document.getElementById('gameOverBackBtn').addEventListener('click', () => {
+  showMenu();
+});
+
+renderMainMenu();
+
+document.addEventListener('click', function once() {
+  initAudio();
+  document.removeEventListener('click', once);
+}, { once: true });
+
+window.addEventListener('resize', () => {
+  if (currentGame) currentGame.resize();
+});
+</script>
+</body>
+</html>
